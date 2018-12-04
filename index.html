@@ -3,7 +3,6 @@
 
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/sandstone/bootstrap.min.css">-->
 <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.8/angular-material.min.css">
 <!-- TODO: make this dynamic somehow based on screen real estate and word length -->
 <style>
@@ -53,7 +52,6 @@
 
 <div layout="row">
 	<div ng-repeat="x in range(columns)" >
-		<!--<div ng-repeat="word in getData(x)" ng-class="{'word-completed': word.completed == true, 'word-not-completed': word.completed == false}">{{ word.plain }}</div>-->
 		<div ng-repeat="word in getData(x)" ng-class="{true: 'word word-completed', false: 'word word-not-completed'}[word.completed]">{{ word.plain }}</div>
 	</div> <!-- ng-repeat -->
 </div>
@@ -64,16 +62,6 @@
 
 
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.4/socket.io.min.js"></script>
-<!--<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.slim.js"></script>
-<script type="text/javascript" charset="utf-8">
-var socket = io.connect("http://" + document.domain + ":" + location.port);
-socket.on('connect', function() {
-	console.log('test meow');
-	socket.emit('my event', {data: 'I\'m connected!'});
-});
-</script>
--->
-
 <script type="text/javascript">
 
 // djb2 hashing algorithm
@@ -130,31 +118,13 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 
 	$scope.stopGame = function() {
 		$scope.hasStarted = false;
-/* Disabled since we don't "know" the words anymore
-		for (var i = 0; i < $scope.data.length; i++) {
-			$scope.data[i].plain = $scope.data[i].word;
-		}
-*/
 		$interval.cancel(counter);
 	}
-
-	$scope.buildData2 = function() {
-		var ret = [];
-		var words = $scope.raw.replace(/\n/g, " ").split(" ");
-		for (var i = 0; i < words.length; i++) {
-			//ret.push({"word": words[i], "completed":false, "plain":words[i]}); // uncomment to cheat
-			ret.push({"word": calchash(words[i].replace(/[^a-zA-Z]/g, "").toLowerCase()), "completed":false, "plain":""});
-		}
-
-		console.log(ret);
-		return ret;
-	};
 
 	$scope.data = [];
 	$scope.gotData = false;
 
 	$scope.buildData = function(response) {
-		// GET FROM API
 		var words = response.data;
 
 		for (var i = 0; i < words.length; i++) {
@@ -165,9 +135,6 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 
 	// TODO: maybe put this on the websocket as well, or actually build the data on game start
 	$http.get('/song').then($scope.buildData, function(r){console.log(r)});
-
-	// TODO: Fill this from API
-	//$scope.data = $scope.buildData2();
 
 	$scope.playerInput = "";
 
@@ -235,7 +202,6 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		}
 	}
 
-	// TODO: replace with hash compare?
 	$scope.wordCompare = function(pinput, source) {
 		pinput = pinput.replace(/[^a-zA-Z]/g, "").toLowerCase();
 		//source = source.replace(/[^a-zA-Z]/g, "").toLowerCase();
@@ -245,7 +211,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 
 	$scope.handleInputChange = $scope.matchWordAnywhere;
 
-	$scope.columns = 12;
+	$scope.columns = 12; // TODO: dynamically calculate this somehow
 	$scope.range = function(num) {
 		var ret = [];
 		for (var i = 0; i < num; i++) {
