@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.8/angular.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/sandstone/bootstrap.min.css">
+
+
+
+<body>
+
+<div ng-app="mporcle" ng-controller="listCtrl">
+
+
+
+<div class="container">
+
+<div class="row">
+	<div class="col">
+		<input type="text" name="playerInput" ng-model="playerInput" ng-change="handleInputChange()" ng-disabled="!hasStarted"/>
+		{{ formatTime(timerSeconds) }}
+	</div>
+	<div class="col">
+		<button type="button" name="button" ng-click="hasStarted ? stopGame() : startGame()">{{ hasStarted ? "Stop" : "Start!" }}</button>
+	</div>
+	<div class="col">
+		<label><input type="radio" ng-model="handleInputChange" ng-value="matchWordAnywhere"/> Match Word Anywhere</label>
+	</div>
+	<div class="col">
+		<label><input type="radio" ng-model="handleInputChange" ng-value="sequenceWords"/> Words in Sequence</label>
+	</div>
+</div>
+
+<div class="row">
+<!-- TODO: Break this table up into columns somehow... -->
+<table class="table table-bordered table-condensed">
+	<tr ng-repeat="word in data">
+		<td ng-style="word.completed ? {'background-color': '#dff0d8'} : {'background-color': '#f2dede'}">{{ word.plain }}</td>
+	</tr>
+</table>
+</div>
+
+
+</div><!-- container -->
+
+
+</div><!-- ng-app -->
+
+</body>
+
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.4/socket.io.min.js"></script>
+<!--<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.slim.js"></script>
+<script type="text/javascript" charset="utf-8">
+var socket = io.connect("http://" + document.domain + ":" + location.port);
+socket.on('connect', function() {
+	console.log('test meow');
+	socket.emit('my event', {data: 'I\'m connected!'});
+});
+</script>
+-->
+
+<script>
+
+// djb2 hashing algorithm
+var calchash = function(chars) {
+	if (typeof chars === 'string') {
+		chars = chars.split('').map(function(str){
+			return str.charCodeAt(0);
+		});
+	}
+
+	if (!Array.isArray(chars)) {
+		throw new Error('input must be a string or an array');
+	}
+
+	return chars.reduce(function(prev, curr){
+		return ((prev << 5) + prev) + curr;
+		}, 5381);
+};
+
+var socket = io.connect("http://" + document.domain + ":" + location.port);
+socket.on('connect', function() {
+	console.log('test meow');
+	socket.emit('my event', {data: 'I\'m connected!'});
+});
+
+var app = angular.module('mporcle', []);
+var parseEntries = app.controller('listCtrl', function($scope, $http, $interval) {
+
+	$scope.hasStarted = false;
+
+
+	counter = ""; // Will be filled with the interval ticker
+	$scope.timerSeconds = 0;
+
+	$scope.formatTime = function(time) {
+		var min = Math.floor(time / 60);
+		var secs = time % 60;
+		if (secs < 10) {
+			secs = "0" + secs
+		}
+		return min + ":" + secs;
+	}
+
+	$scope.startGame = function() {
+		var tick = function() {
+			$scope.timerSeconds++;
+		};
+
+		$scope.timerSeconds = 0;
+		counter = $interval(tick, 1000);
+		$scope.hasStarted = true;
+	};
+
+	$scope.stopGame = function() {
+		$scope.hasStarted = false;
+/* Disabled since we don't "know" the words anymore
+		for (var i = 0; i < $scope.data.length; i++) {
+			$scope.data[i].plain = $scope.data[i].word;
+		}
+*/
+		$interval.cancel(counter);
+	}
+
+	$scope.buildData2 = function() {
+		var ret = [];
+		var words = $scope.raw.replace(/\n/g, " ").split(" ");
+		for (var i = 0; i < words.length; i++) {
+			//ret.push({"word": words[i], "completed":false, "plain":words[i]}); // uncomment to cheat
+			ret.push({"word": calchash(words[i].replace(/[^a-zA-Z]/g, "").toLowerCase()), "completed":false, "plain":""});
+		}
+
+		console.log(ret);
+		return ret;
+	};
+
+	$scope.data = [];
+
+	$scope.buildData = function(response) {
+		// GET FROM API
+		var words = response.data;
+
+		for (var i = 0; i < words.length; i++) {
+			$scope.data.push({"word": words[i], "completed": false, "plain": ""});
+		}
+	};
+
+	// TODO: maybe put this on the websocket as well, or actually build the data on game start
+	$http.get('/song').then($scope.buildData, function(r){console.log(r)});
+
+	// TODO: Fill this from API
+	//$scope.data = $scope.buildData2();
+
+	$scope.playerInput = "";
+
+	// TODO: probably build a hash table or something
+	// Potential issue if $scope.data.length = 0
+	$scope.matchWordAnywhere = function() {
+		var found = false;
+		var complete = true;
+
+		for (var i = 0; i < $scope.data.length; i++) {
+			if ($scope.data[i].completed) {
+				continue;
+			}
+			if ($scope.wordCompare($scope.playerInput, $scope.data[i]["word"])) {
+				socket.emit('try word', {"word":$scope.playerInput, "index": i});
+				$scope.data[i].plain = $scope.playerInput; // Client side cache a potential answer first
+				found = true;
+				continue; // skip over the next line...
+			}
+			complete = false; // ...because if we don't hit this we win!
+			// ...probably. server should control player win status probably
+		}
+
+		if (found) {
+			$scope.playerInput = ""; // We found one, clear input box
+		}
+		if (complete) {
+			// WINNER
+			$scope.stopGame();
+		}
+	};
+
+	// We did indeed get a correct word
+	confirmWord = function(data) {
+		$scope.data[data.index].plain = data.plain;
+		$scope.data[data.index].completed = true;
+		if ($scope.handleInputChange == $scope.sequenceWords)
+			$scope.sequenceNum++;
+	};
+
+	// Either hash collision or bug, server rejected a word
+	rejectWord = function(data) {
+		$scope.data[data.index].plain = "";
+		$scope.data[data.index].completed = false;
+		if ($scope.handleInputChange == $scope.sequenceWords)
+			$scope.sequenceNum--;
+	}
+
+	socket.on('yes word', confirmWord);
+	socket.on('no word', rejectWord);
+
+	$scope.sequenceNum = 0;
+	$scope.sequenceWords = function() {
+		if ($scope.wordCompare($scope.playerInput, $scope.data[$scope.sequenceNum]["word"])) {
+			// TODO: maybe have server enforce player game mode, including sequence
+			socket.emit('try word', {"word":$scope.playerInput, "index": $scope.sequenceNum});
+			$scope.data[$scope.sequenceNum].plain = $scope.playerInput;
+			//$scope.sequenceNum++;
+			$scope.playerInput = "";
+		}
+
+		if ($scope.sequenceNum >= $scope.data.length) {
+			// WINNER
+			$scope.stopGame();
+		}
+	}
+
+	// TODO: replace with hash compare?
+	$scope.wordCompare = function(pinput, source) {
+		pinput = pinput.replace(/[^a-zA-Z]/g, "").toLowerCase();
+		//source = source.replace(/[^a-zA-Z]/g, "").toLowerCase();
+		return calchash(pinput) === source;
+		//return pinput === source;
+	};
+
+	$scope.handleInputChange = $scope.matchWordAnywhere;
+
+});
+</script>
