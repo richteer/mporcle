@@ -5,6 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/sandstone/bootstrap.min.css">-->
 <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.8/angular-material.min.css">
+<!-- TODO: make this dynamic somehow based on screen real estate and word length -->
+<style>
+.word {
+	width: 100px;
+	height:20px;
+	border-style: solid;
+	border-width: 1px;
+}
+
+.word-completed {
+	background-color: #dff0d8;
+}
+
+.word-not-completed {
+   background-color: #f2dede;
+}
+</style>
 </head>
 
 <body>
@@ -17,32 +34,27 @@
 <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.8/angular-material.min.js"></script>
 
 <div layout="row">
-	<div flex ng-cloak>
+	<div ng-cloak>
 		<input type="text" name="playerInput" ng-model="playerInput" ng-change="handleInputChange()" ng-disabled="!hasStarted"/>
+	</div>
+	<div flex="10" ng-cloak>
 		{{ formatTime(timerSeconds) }}
 	</div>
-	<div flex ng-cloak>
-		{{ calcHash(playerInput) }}
-	</div>
-	<div flex ng-cloak> 
+	<div ng-cloak>
 		<button type="button" name="button" ng-click="hasStarted ? stopGame() : startGame()">{{ hasStarted ? "Stop" : "Start!" }}</button>
 	</div>
-	<div flex>
+	<div>
 		<label><input type="radio" ng-model="handleInputChange" ng-value="matchWordAnywhere"/> Match Word Anywhere</label>
 	</div>
-	<div flex>
+	<div>
 		<label><input type="radio" ng-model="handleInputChange" ng-value="sequenceWords"/> Words in Sequence</label>
 	</div>
 </div>
 
 <div layout="row">
-<!-- TODO: Break this table up into columns somehow... -->
-	<div ng-repeat="x in range(columns)" flex>
-		<table>
-			<tr ng-repeat="word in getData(x)">
-				<td ng-style="word.completed ? {'background-color': '#dff0d8'} : {'background-color': '#f2dede'}">{{ word.plain }}</td>
-			</tr>
-		</table>
+	<div ng-repeat="x in range(columns)" >
+		<!--<div ng-repeat="word in getData(x)" ng-class="{'word-completed': word.completed == true, 'word-not-completed': word.completed == false}">{{ word.plain }}</div>-->
+		<div ng-repeat="word in getData(x)" ng-class="{true: 'word word-completed', false: 'word word-not-completed'}[word.completed]">{{ word.plain }}</div>
 	</div> <!-- ng-repeat -->
 </div>
 
@@ -233,7 +245,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 
 	$scope.handleInputChange = $scope.matchWordAnywhere;
 
-	$scope.columns = 4;
+	$scope.columns = 12;
 	$scope.range = function(num) {
 		var ret = [];
 		for (var i = 0; i < num; i++) {
