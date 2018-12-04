@@ -1,47 +1,50 @@
 <!DOCTYPE html>
 <meta charset="UTF-8">
 
-<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.8/angular.js"></script>
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/sandstone/bootstrap.min.css">
-
-
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/sandstone/bootstrap.min.css">-->
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.8/angular-material.min.css">
+</head>
 
 <body>
 
 <div ng-app="mporcle" ng-controller="listCtrl">
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular-animate.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular-aria.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular-messages.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.8/angular-material.min.js"></script>
 
-
-
-<div class="container">
-
-<div class="row">
-	<div class="col">
+<div layout="row">
+	<div flex ng-cloak>
 		<input type="text" name="playerInput" ng-model="playerInput" ng-change="handleInputChange()" ng-disabled="!hasStarted"/>
 		{{ formatTime(timerSeconds) }}
 	</div>
-	<div class="col">
+	<div flex ng-cloak>
+		{{ calcHash(playerInput) }}
+	</div>
+	<div flex ng-cloak> 
 		<button type="button" name="button" ng-click="hasStarted ? stopGame() : startGame()">{{ hasStarted ? "Stop" : "Start!" }}</button>
 	</div>
-	<div class="col">
+	<div flex>
 		<label><input type="radio" ng-model="handleInputChange" ng-value="matchWordAnywhere"/> Match Word Anywhere</label>
 	</div>
-	<div class="col">
+	<div flex>
 		<label><input type="radio" ng-model="handleInputChange" ng-value="sequenceWords"/> Words in Sequence</label>
 	</div>
 </div>
 
-<div class="row">
+<div layout="row">
 <!-- TODO: Break this table up into columns somehow... -->
-<table class="table table-bordered table-condensed">
-	<tr ng-repeat="word in data">
-		<td ng-style="word.completed ? {'background-color': '#dff0d8'} : {'background-color': '#f2dede'}">{{ word.plain }}</td>
-	</tr>
-</table>
+	<div ng-repeat="x in range(columns)" flex>
+		<table>
+			<tr ng-repeat="word in getData(x)">
+				<td ng-style="word.completed ? {'background-color': '#dff0d8'} : {'background-color': '#f2dede'}">{{ word.plain }}</td>
+			</tr>
+		</table>
+	</div> <!-- ng-repeat -->
 </div>
-
-
-</div><!-- container -->
-
 
 </div><!-- ng-app -->
 
@@ -59,7 +62,7 @@ socket.on('connect', function() {
 </script>
 -->
 
-<script>
+<script type="text/javascript">
 
 // djb2 hashing algorithm
 var calchash = function(chars) {
@@ -84,11 +87,12 @@ socket.on('connect', function() {
 	socket.emit('my event', {data: 'I\'m connected!'});
 });
 
-var app = angular.module('mporcle', []);
+var app = angular.module('mporcle', ['ngMaterial', 'ngMessages']);
 var parseEntries = app.controller('listCtrl', function($scope, $http, $interval) {
 
 	$scope.hasStarted = false;
 
+	$scope.calcHash = calchash; // TODO remove
 
 	counter = ""; // Will be filled with the interval ticker
 	$scope.timerSeconds = 0;
@@ -135,6 +139,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	};
 
 	$scope.data = [];
+	$scope.gotData = false;
 
 	$scope.buildData = function(response) {
 		// GET FROM API
@@ -143,6 +148,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		for (var i = 0; i < words.length; i++) {
 			$scope.data.push({"word": words[i], "completed": false, "plain": ""});
 		}
+		$scope.gotData = true;
 	};
 
 	// TODO: maybe put this on the websocket as well, or actually build the data on game start
@@ -226,6 +232,20 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	};
 
 	$scope.handleInputChange = $scope.matchWordAnywhere;
+
+	$scope.columns = 4;
+	$scope.range = function(num) {
+		var ret = [];
+		for (var i = 0; i < num; i++) {
+			ret.push(i);
+		}
+		return ret;
+	};
+
+	$scope.getData = function(col) {
+		var div = Math.floor($scope.data.length / $scope.columns); // length of the column
+		return $scope.data.slice(col * div, (col * div) + div);
+	};
 
 });
 </script>
