@@ -13,6 +13,7 @@ def hash_djb2(s):
 	return hash & 0xFFFFFFFF
 
 # TODO: make this take arbitrary lyric data, maybe a salt
+# TODO: don't squash punctuation in plaintext representation
 def gen_song():
 	ls = TEMPSONG.replace("\n", " ").lower()
 	ls = re.sub('[^a-zA-Z ]', '', ls)
@@ -58,6 +59,7 @@ def tryword(data):
 
 	if word == data["word"]:
 		emit('yes word', {"index":i, "plain": word})
+		# TODO: emit('yes word bc', {"index": i, "player": "SOMETHING"}, broadcast=True)
 	else:
 		emit('no word', {"index":i});
 
