@@ -224,10 +224,6 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		if (found) {
 			$scope.playerInput = ""; // We found one, clear input box
 		}
-		if (complete) {
-			// WINNER
-			$scope.stopGame();
-		}
 	};
 
 	// We did indeed get a correct word
@@ -278,11 +274,6 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 			$scope.data[$scope.sequenceNum].plain = $scope.playerInput;
 			//$scope.sequenceNum++;
 			$scope.playerInput = "";
-		}
-
-		if ($scope.sequenceNum >= $scope.data.length) {
-			// WINNER
-			$scope.stopGame();
 		}
 	}
 
