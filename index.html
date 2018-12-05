@@ -98,7 +98,7 @@
 	<div layout="column">
 		<div class="chatlog">
 			<div ng-repeat="msg in log" layout="row">
-				<div ng-class="msg.style">{{ msg.user }}</div>
+				<div ng-class="msg.style"><{{ msg.user }}></div>
 				<div ng-class="msg.user === 'system' ? 'system-msg' : 'user-msg'">{{ msg.message }}</div>
 			</div>
 		</div>
