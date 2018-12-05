@@ -96,7 +96,7 @@
 		</div> <!-- ng-repeat -->
 	</div>
 	<div layout="column">
-		<div class="chatlog">
+		<div class="chatlog" id="chatlog">
 			<div ng-repeat="msg in log" layout="row">
 				<div ng-class="msg.style"><{{ msg.user }}></div>
 				<div ng-class="msg.user === 'system' ? 'system-msg' : 'user-msg'">{{ msg.message }}</div>
@@ -353,7 +353,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 
 	$scope.chatInput = "";
 	$scope.chatSend = function() {
-		if ($scope.chatSend === "") {
+		if ($scope.chatInput === "") {
 			return;
 		}
 
@@ -362,9 +362,11 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	}
 
 	$scope.log = [];
+	chatlogElement = document.getElementById("chatlog");
 	onChat = function(data) {
 		data.style = 'user';
 		$scope.log.push(data);
+		chatlogElement.scrollTop = chatlogElement.scrollHeight;
 		$scope.$apply();
 	};
 
@@ -388,6 +390,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 			"user": "system",
 			"style": "system-msg"
 		});
+		chatlogElement.scrollTop = chatlogElement.scrollHeight;
 	}
 
 	$scope.systemLog("Welcome to MPorcle!");
