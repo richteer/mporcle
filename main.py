@@ -60,6 +60,7 @@ def disconnect():
 	id = ls.pop(0)  # Can we always assume the id is the first one?
 	for l in ls:
 		# Explicitly call the cleanup
+		emit("user leave", {"room": l, "id": id}, room=l)
 		user_leave(id, l)
 
 # Helper function to clean up game states

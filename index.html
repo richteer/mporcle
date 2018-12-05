@@ -370,6 +370,12 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	};
 	socket.on('user join', onUserJoin);
 
+	onUserLeave = function(data) {
+		$scope.systemLog("" + data.id + " has left the room");
+		$scope.$apply();
+	};
+	socket.on('user leave', onUserLeave);
+
 	$scope.systemLog = function(message) {
 		$scope.log.push({
 			"message": "<system> " + message,
