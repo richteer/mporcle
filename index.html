@@ -64,7 +64,7 @@
 <div layout="row">
 	<!-- TODO: probably make this a URL param or path instead -->
 	<input type="text" name="room" ng-model="roomInput"/>
-	<button type="button" name="join" ng-click="joinRoom()">Join</button>
+	<button type="button" name="join" ng-click="joinRoom()" ng-disabled="!connected">Join</button>
 	{{ joinedRoom ? "Playing in Room " + room : "" }}
 </div>
 
@@ -134,9 +134,6 @@ var calchash = function(chars) {
 };
 
 var socket = io.connect("http://" + document.domain + ":" + location.port);
-socket.on('connect', function() {
-	// TODO: join room here?
-});
 
 
 var app = angular.module('mporcle', ['ngMaterial', 'ngMessages']);
@@ -148,6 +145,12 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	$scope.room = "";
 	$scope.joinedRoom = false;
 	$scope.ready = false;
+	$scope.connected = false;
+
+	socket.on('connect', function(data) {
+		$scope.connected = true;
+		$scope.systemLog("Connected!")
+	});
 
 	$scope.joinRoom = function() {
 		if ($scope.roomInput === "") {
@@ -165,8 +168,6 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		$scope.systemLog("Successfully joined room '" + $scope.room + "'!");
 		$scope.$apply();
 	});
-
-	$scope.calcHash = calchash; // TODO remove
 
 	counter = ""; // Will be filled with the interval ticker
 	$scope.timerSeconds = 0;
