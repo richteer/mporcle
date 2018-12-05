@@ -56,7 +56,7 @@ def get_song():
 @sio.on('disconnect')
 def disconnect():
 	ls = rooms()
-	id = ls.pop(request.sid)
+	id = ls.remove(request.sid)
 	for l in ls:
 		# Explicitly call the cleanup
 		emit("user leave", {"room": l, "id": id}, room=l)
