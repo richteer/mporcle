@@ -42,7 +42,11 @@
 .system-msg {
 	color: gray;
 	font-style: italic;
+	padding-right: 20px;
+}
 
+.user {
+	padding-right: 20px;
 }
 
 </style>
@@ -93,8 +97,9 @@
 	</div>
 	<div layout="column">
 		<div class="chatlog">
-			<div ng-repeat="msg in log" ng-class="msg.user === 'system' ? 'system-msg' : '' ">
-				{{ msg.message }}
+			<div ng-repeat="msg in log" layout="row">
+				<div ng-class="msg.style">{{ msg.user }}</div>
+				<div ng-class="msg.user === 'system' ? 'system-msg' : 'user-msg'">{{ msg.message }}</div>
 			</div>
 		</div>
 		<div>
@@ -358,6 +363,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 
 	$scope.log = [];
 	onChat = function(data) {
+		data.style = 'user';
 		$scope.log.push(data);
 		$scope.$apply();
 	};
@@ -378,8 +384,9 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 
 	$scope.systemLog = function(message) {
 		$scope.log.push({
-			"message": "<system> " + message,
-			"user": "system"
+			"message": message,
+			"user": "system",
+			"style": "system-msg"
 		});
 	}
 

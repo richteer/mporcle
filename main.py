@@ -153,6 +153,7 @@ if __name__ == '__main__':
 @sio.on('chat')
 def chat(data):
 	gid = data["room"]
+	data["user"] = rooms()[0]
 	emit('chat', data, room=gid, broadcast=True)
 
 
