@@ -82,10 +82,10 @@
 		</button>
 	</div>
 	<div>
-		<label><input type="radio" ng-model="handleInputChange" ng-value="matchWordAnywhere"/> Match Word Anywhere</label>
+		<label><input type="radio" value="match" ng-model="mode" ng-click="changeModeRequest('match')" ng-disabled="hasStarted || (!joinedRoom)"/> Match Word Anywhere</label>
 	</div>
 	<div>
-		<label><input type="radio" ng-model="handleInputChange" ng-value="sequenceWords"/> Words in Sequence</label>
+		<label><input type="radio" value="sequence" ng-model="mode" ng-click="changeModeRequest('sequence')" ng-disabled="hasStarted || (!joinedRoom)"/> Words in Sequence</label>
 	</div>
 </div>
 
@@ -146,6 +146,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	$scope.joinedRoom = false;
 	$scope.ready = false;
 	$scope.connected = false;
+	$scope.mode = "match";
 
 	socket.on('connect', function(data) {
 		$scope.connected = true;
@@ -282,16 +283,16 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	confirmWord = function(data) {
 		$scope.data[data.index].plain = data.plain;
 		$scope.data[data.index].completed = true;
-		if ($scope.handleInputChange == $scope.sequenceWords)
-			$scope.sequenceNum++;
+		if (data.next_index)
+			$scope.sequenceNum = data.next_index;
 	};
 
 	// Either hash collision or bug, server rejected a word
 	rejectWord = function(data) {
 		$scope.data[data.index].plain = "";
 		$scope.data[data.index].completed = false;
-		if ($scope.handleInputChange == $scope.sequenceWords)
-			$scope.sequenceNum--;
+		if (data.next_index)
+			$scope.sequenceNum = data.next_index;
 	}
 
 	confirmWordBC = function(data) {
@@ -302,8 +303,8 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		$scope.data[data.index].plain = data.plain;
 		$scope.data[data.index].claimed = true;
 		$scope.data[data.index].completed = true;
-		if ($scope.handleInputChange == $scope.sequenceWords)
-			$scope.sequenceNum++;
+		if (data.next_index)
+			$scope.sequenceNum = data.next_index;
 	};
 
 	socket.on('yes word', confirmWord);
@@ -336,7 +337,40 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		//return pinput === source;
 	};
 
-	$scope.handleInputChange = $scope.matchWordAnywhere;
+
+	$scope.handleInputChange = $scope.matchWordAnywhere; // Default is match
+
+	$scope.changeModeRequest = function(newmode) {
+		if ($scope.hasStarted) {
+			$scope.systemLog("You can't change the game mode when a game is running!");
+			return;
+		}
+		else if (!$scope.joinedRoom) {
+			$scope.systemLog("Join a room before setting the mode!");
+			return;
+		}
+		socket.emit("mode change", {"room": $scope.room, "mode": newmode});
+	};
+
+	onModeChange = function(data) {
+		console.log(data);
+		switch(data["mode"]) {
+			case "match":
+				$scope.handleInputChange = $scope.matchWordAnywhere;
+				break;
+			case "sequence":
+				$scope.handleInputChange = $scope.sequenceWords;
+				break;
+			default:
+				console.log("invalid mode option sent from server, oh dear..." + data.mode);
+				return;
+		};
+
+		$scope.systemLog("Game mode set to: " + data.mode);
+		$scope.mode = data.mode;
+		$scope.$apply();
+	};
+	socket.on("mode change", onModeChange);
 
 	$scope.columns = 12; // TODO: dynamically calculate this somehow
 	$scope.range = function(num) {

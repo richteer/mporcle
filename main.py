@@ -3,8 +3,11 @@ from flask_socketio import SocketIO, emit, join_room, leave_room, rooms
 import re
 
 class GameMode():
+	def init(self):
+		pass
 	def __init__(self, state):
 		self.state = state # in case the mode needs state access
+		self.init()
 	def start_game(self):
 		pass
 	def tryword(self, data):
@@ -21,10 +24,13 @@ class MatchAnywhereMode(GameMode):
 		return (False, data, None)
 
 class SequenceMode(GameMode):
+	def init(self):
+		self.current_index = 0
+
 	def start_game(self):
 		self.current_index = 0
 
-	def tryword(self):
+	def tryword(self, data):
 		word = songs["foo"][self.current_index]  # TODO be self-referential
 
 		if word == data["word"]:
@@ -203,6 +209,21 @@ def game_end(gid):
 
 	data = {}
 	return data
+
+@sio.on("mode change")
+def mode_change(data):
+	gid = data.get("room")
+	if not gid:
+		print("room not set in data")
+		return
+	state = games.get(gid)
+	if not state:
+		print("state not found for room: " + gid)
+		return
+
+	if state.set_mode(data.get("mode")):
+		emit("mode change", data, room=gid, broadcast=True)
+
 
 @sio.on('try word')
 def tryword(data):
