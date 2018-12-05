@@ -12,11 +12,14 @@ class State():
 	def prepare_data(self, blob):
 		pass
 
+	# Add/remove user from the ready list, and return the new status
 	def toggle_ready_user(self, user):
 		if user in self.ready:
 			self.ready.remove(user)
+			return False
 		else:
 			self.ready.append(user)
+			return True
 
 
 games = {}
@@ -83,28 +86,31 @@ def connect():
 @sio.on('join')
 def join(data):
 	user = rooms()[0]
-	state = games.get(data['room'])
+	gid = data['room']
+	state = games.get(gid)
 
 	# Game state not found, lets create one
 	if not state:
-		print("creating new game state: " + data['room'])
+		print("creating new game state: " + gid)
 		state = State()
-		games[data['room']] = state
+		games[gid] = state
 
 	state.users.append(user)
 
-	join_room(data['room'])
-	emit("join success", {"room": data["room"]})
+	join_room(gid)
+	emit("join success", {"room": gid})
+	emit("user join", {"room": gid, "id": user}, room=gid, include_self=False)
 
 @sio.on('ready')
 def ready(data):
+	uid = rooms()[0]
 	state = games.get(data['room'])
 	# TODO: check that a player isn't trying to start a game in a room they are not in?
 	if not state:
 		return # TODO: error message?
 
-	state.toggle_ready_user(rooms()[0])
-	emit('user ready', {"user": rooms()[0], "state": "ready"}, broadcast=True, room=data['room'])
+	ret = state.toggle_ready_user(uid)
+	emit('user ready', {"user": rooms()[0], "state": ret}, room=data['room'], include_self=False)
 
 	if len(state.ready) == len(state.users):
 		emit('game start', broadcast=True, room=data['room'])
@@ -142,6 +148,11 @@ def tryword(data):
 
 if __name__ == '__main__':
 	sio.run(app)
+
+@sio.on('chat')
+def chat(data):
+	gid = data["room"]
+	emit('chat', data, room=gid, broadcast=True)
 
 
 TEMPSONG = '''Somebody once told me the world is gonna roll me I ain't the sharpest tool in the shed

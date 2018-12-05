@@ -24,6 +24,27 @@
 .word-claimed {
 	background-color: #fdffad;
 }
+
+.chatlog {
+	text-align:left;
+	margin:0 auto;
+	margin-bottom:25px;
+	padding:10px;
+	background:#fff;
+	height:270px;
+	width:430px;
+	border:1px solid #ACD8F0;
+	overflow:auto;
+	font-family: monospace;
+}
+
+
+.system-msg {
+	color: gray;
+	font-style: italic;
+
+}
+
 </style>
 </head>
 
@@ -65,9 +86,21 @@
 </div>
 
 <div layout="row">
-	<div ng-repeat="x in range(columns)" >
-		<div ng-repeat="word in getData(x)" ng-class="getWordClass(word)">{{ word.plain }}</div>
-	</div> <!-- ng-repeat -->
+	<div layout="row">
+		<div ng-repeat="x in range(columns)" >
+			<div ng-repeat="word in getData(x)" ng-class="getWordClass(word)">{{ word.plain }}</div>
+		</div> <!-- ng-repeat -->
+	</div>
+	<div layout="column">
+		<div class="chatlog">
+			<div ng-repeat="msg in log" ng-class="msg.user === 'system' ? 'system-msg' : '' ">
+				{{ msg.message }}
+			</div>
+		</div>
+		<div>
+			<input type="text" name="chatlog" ng-model="chatInput" ng-keypress="$event.keyCode === 13 && chatSend()"/>
+		</div>
+	</div>
 </div>
 
 </div><!-- ng-app -->
@@ -114,6 +147,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	$scope.joinRoom = function() {
 		if ($scope.roomInput === "") {
 			console.log("enter a room id first");
+			$scope.systemLog("Enter a room id before attempting to join!")
 			return
 		}
 		socket.emit("join", {"room": $scope.roomInput})
@@ -122,8 +156,9 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	socket.on("join success", function(data) {
 		$scope.room = data.room;
 		$scope.joinedRoom = true;
-		$scope.$apply();
 		console.log("successfully joined room " + $scope.room);
+		$scope.systemLog("Successfully joined room '" + $scope.room + "'!");
+		$scope.$apply();
 	});
 
 	$scope.calcHash = calchash; // TODO remove
@@ -144,11 +179,20 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		if (!$scope.joinedRoom) {
 			// TODO: single player game without room?
 			console.log("cannot start game until you joined a room");
+			$scope.systemLog("Cannot ready up until you join a room!");
 			return;
 		}
-		$scope.ready = true;
+		$scope.ready = !$scope.ready;
 		socket.emit("ready", {"room": $scope.room})
-	}
+		$scope.systemLog($scope.ready ? "You are ready!" : "You are no longer ready...");
+	};
+
+	onReady = function(data) {
+		$scope.systemLog("" + data.user + " is " + (data.state ? "ready" : "not ready"));
+		$scope.$apply();
+	};
+
+	socket.on("user ready", onReady);
 
 	$scope.giveUp = function() {
 		if (!$scope.joinedRoom) {
@@ -167,6 +211,8 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		$scope.timerSeconds = 0;
 		counter = $interval(tick, 1000);
 		$scope.hasStarted = true;
+		$scope.systemLog("Game has started!");
+		$scope.$apply();
 	};
 
 	onStop = function(data) {
@@ -299,6 +345,39 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		var div = Math.floor($scope.data.length / $scope.columns); // length of the column
 		return $scope.data.slice(col * div, (col * div) + div);
 	};
+
+	$scope.chatInput = "";
+	$scope.chatSend = function() {
+		if ($scope.chatSend === "") {
+			return;
+		}
+
+		socket.emit("chat", {"message": $scope.chatInput, "room": $scope.room});
+		$scope.chatInput = "";
+	}
+
+	$scope.log = [];
+	onChat = function(data) {
+		$scope.log.push(data);
+		$scope.$apply();
+	};
+
+	socket.on('chat', onChat);
+
+	onUserJoin = function(data) {
+		$scope.systemLog("" + data.id + " has joined the room");
+		$scope.$apply();
+	};
+	socket.on('user join', onUserJoin);
+
+	$scope.systemLog = function(message) {
+		$scope.log.push({
+			"message": "<system> " + message,
+			"user": "system"
+		});
+	}
+
+	$scope.systemLog("Welcome to MPorcle!");
 
 });
 </script>
