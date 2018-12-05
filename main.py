@@ -71,7 +71,10 @@ def user_leave(user, gid):
 		return
 
 	print(state.users)
-	state.users.remove(user)
+	try:
+		state.users.remove(user)
+	except Exception as e:
+		print(e)
 
 	# If this is the last user to leave, destroy this game context
 	if not state.users:
