@@ -60,6 +60,11 @@ class State():
 		self.ready = []
 		self.mode.start_game()
 
+	def stop_game(self):
+		self.running = False
+		self.ready = []
+		#self.mode.stop_game() # TODO
+
 	# Add/remove user from the ready list, and return the new status
 	def toggle_ready_user(self, user):
 		if user in self.ready:
@@ -203,7 +208,7 @@ def surrender(data):
 # Helper for all the close game reset logic
 def game_end(gid):
 	state = games.get(gid)
-	state.start_game()
+	state.stop_game()
 
 	state.ready = []
 
