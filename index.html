@@ -367,8 +367,8 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	onChat = function(data) {
 		data.style = 'user';
 		$scope.log.push(data);
-		chatlogElement.scrollTop = chatlogElement.scrollHeight;
 		$scope.$apply();
+		chatlogElement.scrollTop = chatlogElement.scrollHeight;
 	};
 
 	socket.on('chat', onChat);
