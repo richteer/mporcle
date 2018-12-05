@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_from_directory, jsonify
+from flask import Flask, render_template, send_from_directory, jsonify, request
 from flask_socketio import SocketIO, emit, join_room, leave_room, rooms
 import re
 
@@ -56,8 +56,7 @@ def get_song():
 @sio.on('disconnect')
 def disconnect():
 	ls = rooms()
-	print(ls)
-	id = ls.pop(0)  # Can we always assume the id is the first one?
+	id = ls.pop(request.sid)
 	for l in ls:
 		# Explicitly call the cleanup
 		emit("user leave", {"room": l, "id": id}, room=l)
@@ -86,7 +85,7 @@ def connect():
 
 @sio.on('join')
 def join(data):
-	user = rooms()[0]
+	user = request.sid
 	gid = data['room']
 	state = games.get(gid)
 
@@ -104,14 +103,14 @@ def join(data):
 
 @sio.on('ready')
 def ready(data):
-	uid = rooms()[0]
+	uid = request.sid
 	state = games.get(data['room'])
 	# TODO: check that a player isn't trying to start a game in a room they are not in?
 	if not state:
 		return # TODO: error message?
 
 	ret = state.toggle_ready_user(uid)
-	emit('user ready', {"user": rooms()[0], "state": ret}, room=data['room'], include_self=False)
+	emit('user ready', {"user": uid, "state": ret}, room=data['room'], include_self=False)
 
 	if len(state.ready) == len(state.users):
 		emit('game start', broadcast=True, room=data['room'])
@@ -152,8 +151,9 @@ if __name__ == '__main__':
 
 @sio.on('chat')
 def chat(data):
+	print(request.sid)
 	gid = data["room"]
-	data["user"] = rooms()[0]
+	data["user"] = request.sid
 	emit('chat', data, room=gid, broadcast=True)
 
 
