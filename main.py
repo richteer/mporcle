@@ -2,15 +2,57 @@ from flask import Flask, render_template, send_from_directory, jsonify, request
 from flask_socketio import SocketIO, emit, join_room, leave_room, rooms
 import re
 
+class GameMode():
+	def __init__(self, state):
+		self.state = state # in case the mode needs state access
+	def start_game(self):
+		pass
+	def tryword(self, data):
+		pass
+
+class MatchAnywhereMode(GameMode):
+	def tryword(self, data):
+		i = data["index"]
+		word = songs["foo"][i]  # TODO be self-referential for what game data is selected
+
+		if word == data["word"]:
+			data["plain"] = word # TODO: conver to real plaintext here
+			return (True, data, data)
+		return (False, data, None)
+
+class SequenceMode(GameMode):
+	def start_game(self):
+		self.current_index = 0
+
+	def tryword(self):
+		word = songs["foo"][self.current_index]  # TODO be self-referential
+
+		if word == data["word"]:
+			self.current_index += 1
+			data["plain"] = word
+			data["next_index"] = self.current_index
+			return (True, data, data)
+
+		data["next_index"] = self.current_index
+		return (False, data, None)
+
+
 class State():
 	def __init__(self):
 		self.users = []
 		self.ready = []
 		self.running = False
+		self.set_mode("match")
+		self.tryword_check = None
 
 	# Convert a game data blob into a useful form for managing state
 	def prepare_data(self, blob):
 		pass
+
+	def start_game(self):
+		self.running = True
+		self.ready = []
+		self.mode.start_game()
 
 	# Add/remove user from the ready list, and return the new status
 	def toggle_ready_user(self, user):
@@ -21,6 +63,31 @@ class State():
 			self.ready.append(user)
 			return True
 
+	# Expects "word", "index" to be filled, and returns a triple of
+	#  Boolean - was the word correct or not
+	#  Dict - data to pass to the sender
+	#  Dict - data to broadcast to everyone
+	# self.tryword_check is to be set to the current game mode's handler
+	# TODO: Acutally define those exceptions for proper catching
+	def tryword(self, data):
+		if not self.running:
+			raise Exception("Tryword called without game started")
+
+		if not self.mode:
+			raise Exception("Mode never set")
+
+		return self.mode.tryword(data)
+
+
+	# Set the mode flag and and game handlers
+	def set_mode(self, mode):
+		if mode == "match":
+			self.mode = MatchAnywhereMode(self)
+		elif mode == "sequence":
+			self.mode = SequenceMode(self)
+		else:
+			return False # Bad mode switch sent by client
+		return True
 
 games = {}
 
@@ -130,7 +197,7 @@ def surrender(data):
 # Helper for all the close game reset logic
 def game_end(gid):
 	state = games.get(gid)
-	state.running = False
+	state.start_game()
 
 	state.ready = []
 
@@ -139,15 +206,18 @@ def game_end(gid):
 
 @sio.on('try word')
 def tryword(data):
-	print(data)
-	i = data["index"]
-	word = songs["foo"][i]
+	state = games.get(data["room"])
+	if not state:
+		print("COULD NOT FIND GAME: " + data["room"])
+		return
 
-	if word == data["word"]:
-		emit('yes word', {"index":i, "plain": word}) # tell them they are correct
-		emit('yes word bc', {"index":i, "plain": word}, room=data["room"], broadcast=True)
+	success, resp, respBC = state.tryword(data)
+
+	if success:
+		emit('yes word', resp) # tell them they are correct
+		emit('yes word bc', respBC, room=data["room"], broadcast=True)
 	else:
-		emit('no word', {"index":i}, room=data["room"]);
+		emit('no word', resp, room=data["room"]);
 
 if __name__ == '__main__':
 	sio.run(app)
