@@ -53,7 +53,6 @@
 </head>
 
 <body>
-
 <div ng-app="mporcle" ng-controller="listCtrl">
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular-animate.min.js"></script>
@@ -61,6 +60,7 @@
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular-messages.min.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.8/angular-material.min.js"></script>
 
+<title>MPorcle {{ joinedRoom ? " - " + room : "" }}</title>
 <div layout="row">
 	<!-- TODO: probably make this a URL param or path instead -->
 	<input type="text" name="room" ng-model="roomInput"/>
