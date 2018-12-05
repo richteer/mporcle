@@ -129,7 +129,7 @@ var calchash = function(chars) {
 	}
 
 	return chars.reduce(function(prev, curr){
-		return ((prev << 5) + prev) + curr;
+		return (((prev << 5) + prev) >>> 0) + curr;
 		}, 5381);
 };
 
