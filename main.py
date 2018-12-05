@@ -67,11 +67,11 @@ def disconnect():
 def user_leave(user, gid):
 	print("removing {} from {}".format(user, gid))
 	state = games.get(gid)
-	print(state.users)
 	if not state:
 		print("Game id {} not found".format(gid))
 		return
 
+	print(state.users)
 	state.users.remove(user)
 
 	# If this is the last user to leave, destroy this game context
