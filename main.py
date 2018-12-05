@@ -13,13 +13,19 @@ class GameMode():
 	def tryword(self, data):
 		pass
 
+# TODO: convert to real plaintext
+# TODO: Optimize with dictionary lookup probably
 class MatchAnywhereMode(GameMode):
 	def tryword(self, data):
-		i = data["index"]
-		word = songs["foo"][i]  # TODO be self-referential for what game data is selected
 
-		if word == data["word"]:
-			data["plain"] = word # TODO: conver to real plaintext here
+		words = []
+		for i in range(len(songs["foo"])):
+			if songs["foo"][i] == data["word"]:
+				words.append({"plain":songs["foo"][i], "index":i})
+
+		if words:
+			data["words"] = words
+			data["count"] = len(words)
 			return (True, data, data)
 		return (False, data, None)
 
@@ -34,8 +40,9 @@ class SequenceMode(GameMode):
 		word = songs["foo"][self.current_index]  # TODO be self-referential
 
 		if word == data["word"]:
+			data["words"] = [{"plain": word, "index": self.current_index}]
+			data["count"] = 1
 			self.current_index += 1
-			data["plain"] = word
 			data["next_index"] = self.current_index
 			return (True, data, data)
 

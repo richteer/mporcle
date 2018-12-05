@@ -258,53 +258,59 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 	// Potential issue if $scope.data.length = 0
 	$scope.matchWordAnywhere = function() {
 		var found = false;
-		var complete = true;
 
 		for (var i = 0; i < $scope.data.length; i++) {
 			if ($scope.data[i].completed) {
 				continue;
 			}
 			if ($scope.wordCompare($scope.playerInput, $scope.data[i]["word"])) {
-				socket.emit('try word', {"word":$scope.playerInput, "index": i, "room": $scope.room});
 				$scope.data[i].plain = $scope.playerInput; // Client side cache a potential answer first
+				if (found) continue; // Only emit once, client side cache all though
 				found = true;
-				continue; // skip over the next line...
+				socket.emit('try word', {"word":$scope.playerInput, "index": i, "room": $scope.room});
 			}
-			complete = false; // ...because if we don't hit this we win!
-			// ...probably. server should control player win status probably
 		}
-
-		if (found) {
+		if (found)
 			$scope.playerInput = ""; // We found one, clear input box
-		}
 	};
 
 	// We did indeed get a correct word
 	confirmWord = function(data) {
-		$scope.data[data.index].plain = data.plain;
-		$scope.data[data.index].completed = true;
+		for (var i = 0; i < data.count; i++) {
+			d = data.words[i];
+			$scope.data[d.index].plain = d.plain;
+			$scope.data[d.index].completed = true;
+		}
 		if (data.next_index)
 			$scope.sequenceNum = data.next_index;
 	};
 
 	// Either hash collision or bug, server rejected a word
 	rejectWord = function(data) {
-		$scope.data[data.index].plain = "";
-		$scope.data[data.index].completed = false;
+		for (var i = 0; i < data.count; i++) {
+			d = data.words[i];
+			$scope.data[d.index].plain = "";
+			$scope.data[d.index].completed = false;
+		}
 		if (data.next_index)
 			$scope.sequenceNum = data.next_index;
 	}
 
 	confirmWordBC = function(data) {
-		if ($scope.data[data.index].completed) {
-			return;
-		}
+		for (var i = 0; i < data.count; i++) {
+			d = data.words[i];
 
-		$scope.data[data.index].plain = data.plain;
-		$scope.data[data.index].claimed = true;
-		$scope.data[data.index].completed = true;
+			if ($scope.data[d.index].completed) {
+				continue;
+			}
+
+			$scope.data[d.index].plain = d.plain;
+			$scope.data[d.index].claimed = true;
+			$scope.data[d.index].completed = true;
+		}
 		if (data.next_index)
 			$scope.sequenceNum = data.next_index;
+
 	};
 
 	socket.on('yes word', confirmWord);
