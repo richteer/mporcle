@@ -18,7 +18,11 @@
 }
 
 .word-not-completed {
-   background-color: #f2dede;
+	background-color: #f2dede;
+}
+
+.word-claimed {
+	background-color: #fdffad;
 }
 </style>
 </head>
@@ -33,6 +37,14 @@
 <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.8/angular-material.min.js"></script>
 
 <div layout="row">
+	<!-- TODO: probably make this a URL param or path instead -->
+	<input type="text" name="room" ng-model="roomInput"/>
+	<button type="button" name="join" ng-click="joinRoom()">Join</button>
+	{{ joinedRoom ? "Playing in Room " + room : "" }}
+</div>
+
+
+<div layout="row">
 	<div ng-cloak>
 		<input type="text" name="playerInput" ng-model="playerInput" ng-change="handleInputChange()" ng-disabled="!hasStarted"/>
 	</div>
@@ -40,7 +52,9 @@
 		{{ formatTime(timerSeconds) }}
 	</div>
 	<div ng-cloak>
-		<button type="button" name="button" ng-click="hasStarted ? stopGame() : startGame()">{{ hasStarted ? "Stop" : "Start!" }}</button>
+		<button type="button" name="start" ng-click="hasStarted ? giveUp() : readyUp()" ng-disabled="!joinedRoom">
+			{{ hasStarted ? "Give Up" : (ready ? "Unready" : "Ready") }}
+		</button>
 	</div>
 	<div>
 		<label><input type="radio" ng-model="handleInputChange" ng-value="matchWordAnywhere"/> Match Word Anywhere</label>
@@ -52,7 +66,7 @@
 
 <div layout="row">
 	<div ng-repeat="x in range(columns)" >
-		<div ng-repeat="word in getData(x)" ng-class="{true: 'word word-completed', false: 'word word-not-completed'}[word.completed]">{{ word.plain }}</div>
+		<div ng-repeat="word in getData(x)" ng-class="getWordClass(word)">{{ word.plain }}</div>
 	</div> <!-- ng-repeat -->
 </div>
 
@@ -83,14 +97,34 @@ var calchash = function(chars) {
 
 var socket = io.connect("http://" + document.domain + ":" + location.port);
 socket.on('connect', function() {
-	console.log('test meow');
-	socket.emit('my event', {data: 'I\'m connected!'});
+	// TODO: join room here?
 });
+
 
 var app = angular.module('mporcle', ['ngMaterial', 'ngMessages']);
 var parseEntries = app.controller('listCtrl', function($scope, $http, $interval) {
 
 	$scope.hasStarted = false;
+
+	$scope.roomInput = "";
+	$scope.room = "";
+	$scope.joinedRoom = false;
+	$scope.ready = false;
+
+	$scope.joinRoom = function() {
+		if ($scope.roomInput === "") {
+			console.log("enter a room id first");
+			return
+		}
+		socket.emit("join", {"room": $scope.roomInput})
+	};
+
+	socket.on("join success", function(data) {
+		$scope.room = data.room;
+		$scope.joinedRoom = true;
+		$scope.$apply();
+		console.log("successfully joined room " + $scope.room);
+	});
 
 	$scope.calcHash = calchash; // TODO remove
 
@@ -106,7 +140,26 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		return min + ":" + secs;
 	}
 
-	$scope.startGame = function() {
+	$scope.readyUp = function() {
+		if (!$scope.joinedRoom) {
+			// TODO: single player game without room?
+			console.log("cannot start game until you joined a room");
+			return;
+		}
+		$scope.ready = true;
+		socket.emit("ready", {"room": $scope.room})
+	}
+
+	$scope.giveUp = function() {
+		if (!$scope.joinedRoom) {
+			console.log("how tho");
+			return
+		}
+
+		socket.emit("surrender", {"room": $scope.room});
+	}
+
+	onStart = function() {
 		var tick = function() {
 			$scope.timerSeconds++;
 		};
@@ -116,21 +169,31 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 		$scope.hasStarted = true;
 	};
 
-	$scope.stopGame = function() {
+	onStop = function(data) {
 		$scope.hasStarted = false;
+		$scope.ready = false;
 		$interval.cancel(counter);
+		$scope.$apply();
 	}
 
+	socket.on('game start', onStart);
+	socket.on('game stop', onStop);
+
+
 	$scope.data = [];
-	$scope.gotData = false;
 
 	$scope.buildData = function(response) {
 		var words = response.data;
 
 		for (var i = 0; i < words.length; i++) {
-			$scope.data.push({"word": words[i], "completed": false, "plain": ""});
+			$scope.data.push(
+				{
+					"word": words[i],	// Hash of the word
+					"completed": false,	// Has this word been solved yet?
+					"claimed": false,	// Has this word been claimed by an opponent?
+					"plain": "",		// Plaintext of the word to be filled by server
+				});
 		}
-		$scope.gotData = true;
 	};
 
 	// TODO: maybe put this on the websocket as well, or actually build the data on game start
@@ -149,7 +212,7 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 				continue;
 			}
 			if ($scope.wordCompare($scope.playerInput, $scope.data[i]["word"])) {
-				socket.emit('try word', {"word":$scope.playerInput, "index": i});
+				socket.emit('try word', {"word":$scope.playerInput, "index": i, "room": $scope.room});
 				$scope.data[i].plain = $scope.playerInput; // Client side cache a potential answer first
 				found = true;
 				continue; // skip over the next line...
@@ -183,14 +246,35 @@ var parseEntries = app.controller('listCtrl', function($scope, $http, $interval)
 			$scope.sequenceNum--;
 	}
 
+	confirmWordBC = function(data) {
+		if ($scope.data[data.index].completed) {
+			return;
+		}
+
+		$scope.data[data.index].plain = data.plain;
+		$scope.data[data.index].claimed = true;
+		$scope.data[data.index].completed = true;
+		if ($scope.handleInputChange == $scope.sequenceWords)
+			$scope.sequenceNum++;
+	};
+
 	socket.on('yes word', confirmWord);
 	socket.on('no word', rejectWord);
+	socket.on('yes word bc', confirmWordBC);
+
+	$scope.getWordClass = function(word) {
+		if (word.claimed)
+			return "word word-claimed";
+		if (word.completed)
+			return "word word-completed";
+		return "word word-not-completed";
+	};
 
 	$scope.sequenceNum = 0;
 	$scope.sequenceWords = function() {
 		if ($scope.wordCompare($scope.playerInput, $scope.data[$scope.sequenceNum]["word"])) {
 			// TODO: maybe have server enforce player game mode, including sequence
-			socket.emit('try word', {"word":$scope.playerInput, "index": $scope.sequenceNum});
+			socket.emit('try word', {"word":$scope.playerInput, "index": $scope.sequenceNum, "room": $scope.room});
 			$scope.data[$scope.sequenceNum].plain = $scope.playerInput;
 			//$scope.sequenceNum++;
 			$scope.playerInput = "";

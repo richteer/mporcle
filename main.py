@@ -1,10 +1,30 @@
 from flask import Flask, render_template, send_from_directory, jsonify
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room, leave_room, rooms
 import re
+
+class State():
+	def __init__(self):
+		self.users = []
+		self.ready = []
+		self.running = False
+
+	# Convert a game data blob into a useful form for managing state
+	def prepare_data(self, blob):
+		pass
+
+	def toggle_ready_user(self, user):
+		if user in self.ready:
+			self.ready.remove(user)
+		else:
+			self.ready.append(user)
+
+
+games = {}
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 sio = SocketIO(app, logger=True)
+
 
 def hash_djb2(s):
 	hash = 5381
@@ -29,39 +49,96 @@ def index():
 def get_song():
 	return jsonify(list(map(hash_djb2, songs["foo"])))
 
-def get_song2():
-	ls = TEMPSONG.replace("\n", " ").lower()
-	ls = re.sub('[^a-zA-Z ]', '', ls)
-	ls = ls.split(" ")
 
-	ls = list(map(hash_djb2, ls))
-	return jsonify(ls)
+@sio.on('disconnect')
+def disconnect():
+	ls = rooms()
+	print(ls)
+	id = ls.pop(0)  # Can we always assume the id is the first one?
+	for l in ls:
+		# Explicitly call the cleanup
+		user_leave(id, l)
+
+# Helper function to clean up game states
+def user_leave(user, gid):
+	print("removing {} from {}".format(user, gid))
+	state = games.get(gid)
+	print(state.users)
+	if not state:
+		print("Game id {} not found".format(gid))
+		return
+
+	state.users.remove(user)
+
+	# If this is the last user to leave, destroy this game context
+	if not state.users:
+		print("deleting game state: " + gid)
+		del games[gid]
 
 
-@sio.on('connect', namespace='/chat')
-def connect(sid, environ):
-	print("connect ", sid)
+@sio.on('connect')
+def connect():
+	pass
 
-@sio.on('chat message', namespace='/chat')
-def message(sid, data):
-	print("message ", data)
-	sio.emit('reply', room=sid)
+@sio.on('join')
+def join(data):
+	user = rooms()[0]
+	state = games.get(data['room'])
 
-@sio.on('disconnect', namespace='/chat')
-def disconnect(sid):
-	print('disconnect ', sid)
+	# Game state not found, lets create one
+	if not state:
+		print("creating new game state: " + data['room'])
+		state = State()
+		games[data['room']] = state
 
+	state.users.append(user)
+
+	join_room(data['room'])
+	emit("join success", {"room": data["room"]})
+
+@sio.on('ready')
+def ready(data):
+	state = games.get(data['room'])
+	# TODO: check that a player isn't trying to start a game in a room they are not in?
+	if not state:
+		return # TODO: error message?
+
+	state.toggle_ready_user(rooms()[0])
+	emit('user ready', {"user": rooms()[0], "state": "ready"}, broadcast=True, room=data['room'])
+
+	if len(state.ready) == len(state.users):
+		emit('game start', broadcast=True, room=data['room'])
+		state.running = True
+
+@sio.on('surrender')
+def surrender(data):
+	gid = data.get("room")
+
+	ret = game_end(gid)
+
+	emit('game stop', ret, broadcast=True, room=gid)
+
+# Helper for all the close game reset logic
+def game_end(gid):
+	state = games.get(gid)
+	state.running = False
+
+	state.ready = []
+
+	data = {}
+	return data
 
 @sio.on('try word')
 def tryword(data):
+	print(data)
 	i = data["index"]
 	word = songs["foo"][i]
 
 	if word == data["word"]:
-		emit('yes word', {"index":i, "plain": word})
-		# TODO: emit('yes word bc', {"index": i, "player": "SOMETHING"}, broadcast=True)
+		emit('yes word', {"index":i, "plain": word}) # tell them they are correct
+		emit('yes word bc', {"index":i, "plain": word}, room=data["room"], broadcast=True)
 	else:
-		emit('no word', {"index":i});
+		emit('no word', {"index":i}, room=data["room"]);
 
 if __name__ == '__main__':
 	sio.run(app)
