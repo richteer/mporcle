@@ -19,9 +19,9 @@ class MatchAnywhereMode(GameMode):
 	def tryword(self, data):
 
 		words = []
-		for i in range(len(songs["foo"])):
-			if songs["foo"][i] == data["word"]:
-				words.append({"plain":songs["foo"][i], "index":i})
+		for i in range(len(self.state.words)):
+			if self.state.words[i]["word"] == data["word"]:
+				words.append({"plain":self.state.words[i]["plain"], "index":i})
 
 		if words:
 			data["words"] = words
@@ -37,10 +37,10 @@ class SequenceMode(GameMode):
 		self.current_index = 0
 
 	def tryword(self, data):
-		word = songs["foo"][self.current_index]  # TODO be self-referential
+		word = self.state.words[self.current_index]  # TODO be self-referential
 
-		if word == data["word"]:
-			data["words"] = [{"plain": word, "index": self.current_index}]
+		if word["word"] == data["word"]:
+			data["words"] = [{"plain": word["plain"], "index": self.current_index}]
 			data["count"] = 1
 			self.current_index += 1
 			data["next_index"] = self.current_index
@@ -58,9 +58,20 @@ class State():
 		self.set_mode("match")
 		self.tryword_check = None
 
+		# TODO: Create selecting interface
+		# TODO: Get this from db
+		self.prepare_data(TEMPSONG)
+
 	# Convert a game data blob into a useful form for managing state
+	# Game modes should convert this into a more optimized form
 	def prepare_data(self, blob):
-		pass
+		self.words = []
+		ls = blob.replace("\n", " ").split(" ")
+		for l in ls:
+			self.words.append({
+				"plain": l,
+				"word": re.sub('[^a-zA-Z]', '', l).lower()
+			})
 
 	def start_game(self):
 		self.running = True
